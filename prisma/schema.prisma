@@ -1,0 +1,129 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id                   String    @id @default(cuid())
+  email                String    @unique
+  passwordHash         String    @map("password_hash")
+  username             String?   @unique
+  profileName          String?   @map("profile_name")
+  profileBio           String?   @map("profile_bio")
+  profileImageUrl      String?   @map("profile_image_url")
+  subscriptionTier     String    @default("free") @map("subscription_tier")
+  stripeCustomerId     String?   @unique @map("stripe_customer_id")
+  emailVerified        Boolean   @default(false) @map("email_verified")
+  emailVerificationToken String? @map("email_verification_token")
+  passwordResetToken   String?   @map("password_reset_token")
+  passwordResetExpires DateTime? @map("password_reset_expires")
+  isAdmin              Boolean   @default(false) @map("is_admin")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  bioPage       BioPage?
+  subscriptions Subscription[]
+  analyticsEvents AnalyticsEvent[]
+
+  @@map("users")
+}
+
+model BioPage {
+  id               String       @id @default(cuid())
+  userId           String       @unique @map("user_id")
+  themeId          String       @default("default") @map("theme_id")
+  customColors     String?      @map("custom_colors") // JSON as string for SQLite
+  isPublished      Boolean      @default(true) @map("is_published")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  links           Link[]
+  analyticsEvents AnalyticsEvent[]
+  theme           Theme          @relation(fields: [themeId], references: [id])
+
+  @@map("bio_pages")
+}
+
+model Link {
+  id         String   @id @default(cuid())
+  bioPageId  String   @map("bio_page_id")
+  title      String
+  url        String
+  iconName   String?  @map("icon_name")
+  isActive   Boolean  @default(true) @map("is_active")
+  orderIndex Int      @map("order_index")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  bioPage         BioPage          @relation(fields: [bioPageId], references: [id], onDelete: Cascade)
+  analyticsEvents AnalyticsEvent[]
+
+  @@map("links")
+}
+
+model AnalyticsEvent {
+  id            String   @id @default(cuid())
+  bioPageId     String   @map("bio_page_id")
+  userId        String   @map("user_id")
+  eventType     String   @map("event_type") // 'page_view' or 'link_click'
+  linkId        String?  @map("link_id")
+  visitorIpHash String   @map("visitor_ip_hash")
+  userAgent     String?  @map("user_agent")
+  referrer      String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relations
+  bioPage BioPage @relation(fields: [bioPageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  link    Link?   @relation(fields: [linkId], references: [id], onDelete: SetNull)
+
+  @@index([bioPageId, eventType, createdAt])
+  @@index([userId, eventType, createdAt])
+  @@index([visitorIpHash, bioPageId, createdAt])
+  @@map("analytics_events")
+}
+
+model Subscription {
+  id                    String    @id @default(cuid())
+  userId                String    @unique @map("user_id")
+  stripeSubscriptionId  String?   @unique @map("stripe_subscription_id")
+  stripeCustomerId      String?   @map("stripe_customer_id")
+  planId                String    @default("free") @map("plan_id")
+  status                String    // active, canceled, past_due, etc.
+  currentPeriodStart    DateTime? @map("current_period_start")
+  currentPeriodEnd      DateTime? @map("current_period_end")
+  cancelAtPeriodEnd     Boolean   @default(false) @map("cancel_at_period_end")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+model Theme {
+  id               String    @id
+  name             String
+  isPremium        Boolean   @default(false) @map("is_premium")
+  previewImageUrl  String?   @map("preview_image_url")
+  cssTemplate      String    @map("css_template")
+  colorVariables   String    @map("color_variables") // JSON as string for SQLite
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  bioPages BioPage[]
+
+  @@map("themes")
+}

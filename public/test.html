@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkHub Test Page</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-2xl mx-auto">
+        <h1 class="text-3xl font-bold mb-6">🧪 LinkHub SaaS Test Page</h1>
+        
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Test Bio Page API</h2>
+            <button onclick="testBioPage()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                Test demoaccount Bio Page
+            </button>
+            <div id="bioResult" class="mt-4 p-4 bg-gray-50 rounded hidden">
+                <pre id="bioData" class="text-sm overflow-auto"></pre>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Test Links</h2>
+            <div class="space-y-2">
+                <a href="/demoaccount" target="_blank" class="block bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-center">
+                    Visit demoaccount Bio Page (HTML)
+                </a>
+                <a href="/" target="_blank" class="block bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 text-center">
+                    Visit Main Dashboard
+                </a>
+                <a href="/api/themes" target="_blank" class="block bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700 text-center">
+                    View Available Themes (JSON)
+                </a>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-xl font-semibold mb-4">Server Status</h2>
+            <button onclick="testHealth()" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">
+                Check Server Health
+            </button>
+            <div id="healthResult" class="mt-4 p-4 bg-gray-50 rounded hidden">
+                <pre id="healthData" class="text-sm overflow-auto"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function testBioPage() {
+            try {
+                const response = await fetch('/demoaccount', {
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                const data = await response.json();
+                
+                document.getElementById('bioData').textContent = JSON.stringify(data, null, 2);
+                document.getElementById('bioResult').classList.remove('hidden');
+                
+                if (data.success) {
+                    document.getElementById('bioResult').className = 'mt-4 p-4 bg-green-50 rounded border border-green-200';
+                } else {
+                    document.getElementById('bioResult').className = 'mt-4 p-4 bg-red-50 rounded border border-red-200';
+                }
+            } catch (error) {
+                document.getElementById('bioData').textContent = 'Error: ' + error.message;
+                document.getElementById('bioResult').classList.remove('hidden');
+                document.getElementById('bioResult').className = 'mt-4 p-4 bg-red-50 rounded border border-red-200';
+            }
+        }
+
+        async function testHealth() {
+            try {
+                const response = await fetch('/health');
+                const data = await response.json();
+                
+                document.getElementById('healthData').textContent = JSON.stringify(data, null, 2);
+                document.getElementById('healthResult').classList.remove('hidden');
+                document.getElementById('healthResult').className = 'mt-4 p-4 bg-green-50 rounded border border-green-200';
+            } catch (error) {
+                document.getElementById('healthData').textContent = 'Error: ' + error.message;
+                document.getElementById('healthResult').classList.remove('hidden');
+                document.getElementById('healthResult').className = 'mt-4 p-4 bg-red-50 rounded border border-red-200';
+            }
+        }
+    </script>
+</body>
+</html>

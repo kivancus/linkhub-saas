@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Bio Page</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-2xl mx-auto">
+        <h1 class="text-3xl font-bold mb-6">🐛 Debug Bio Page</h1>
+        
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Test API Call</h2>
+            <button id="testButton" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                Test demoaccount API
+            </button>
+            <div id="result" class="mt-4 p-4 bg-gray-50 rounded hidden">
+                <pre id="data" class="text-sm overflow-auto whitespace-pre-wrap"></pre>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-xl font-semibold mb-4">Bio Page Preview</h2>
+            <div id="bioPreview" class="hidden">
+                <div class="text-center mb-4">
+                    <h3 id="profileName" class="text-xl font-bold"></h3>
+                    <p id="username" class="text-gray-600"></p>
+                </div>
+                <div id="links" class="space-y-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Add event listener when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('testButton').addEventListener('click', testAPI);
+        });
+
+        async function testAPI() {
+            try {
+                console.log('Testing API call...');
+                
+                const response = await fetch('/api/bio-page/public/demoaccount', {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                console.log('Response status:', response.status);
+                console.log('Response headers:', [...response.headers.entries()]);
+                
+                const responseText = await response.text();
+                console.log('Raw response:', responseText);
+                
+                document.getElementById('data').textContent = responseText;
+                document.getElementById('result').classList.remove('hidden');
+                
+                if (response.ok) {
+                    document.getElementById('result').className = 'mt-4 p-4 bg-green-50 rounded border border-green-200';
+                    
+                    // Try to parse and display
+                    try {
+                        const data = JSON.parse(responseText);
+                        if (data.success) {
+                            displayBioPage(data.data);
+                        }
+                    } catch (e) {
+                        console.error('Parse error:', e);
+                    }
+                } else {
+                    document.getElementById('result').className = 'mt-4 p-4 bg-red-50 rounded border border-red-200';
+                }
+                
+            } catch (error) {
+                console.error('Fetch error:', error);
+                document.getElementById('data').textContent = 'Error: ' + error.message;
+                document.getElementById('result').classList.remove('hidden');
+                document.getElementById('result').className = 'mt-4 p-4 bg-red-50 rounded border border-red-200';
+            }
+        }
+        
+        function displayBioPage(data) {
+            document.getElementById('profileName').textContent = data.user.profileName || `@${data.user.username}`;
+            document.getElementById('username').textContent = data.user.username;
+            
+            const linksContainer = document.getElementById('links');
+            linksContainer.innerHTML = '';
+            
+            data.bioPage.links.forEach(link => {
+                const linkElement = document.createElement('div');
+                linkElement.className = 'bg-blue-100 p-3 rounded';
+                linkElement.innerHTML = `
+                    <div class="font-medium">${link.title}</div>
+                    <div class="text-sm text-gray-600">${link.url}</div>
+                `;
+                linksContainer.appendChild(linkElement);
+            });
+            
+            document.getElementById('bioPreview').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
