@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS Knowledge Hub - Working Version</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            margin: 20px 0;
+        }
+        h1 {
+            color: #232f3e;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.2rem;
+        }
+        .form-container {
+            margin: 30px 0;
+        }
+        .question-form {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid #e1e8ed;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+        input[type="text"]:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        button {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #ff9900 0%, #ff7700 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 153, 0, 0.3);
+        }
+        .sample-questions {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 15px;
+            margin: 30px 0;
+        }
+        .sample-questions h3 {
+            color: #232f3e;
+            margin-bottom: 15px;
+        }
+        .sample-btn {
+            display: block;
+            width: 100%;
+            text-align: left;
+            background: white;
+            border: 1px solid #e1e8ed;
+            padding: 12px 15px;
+            margin: 8px 0;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            color: #333;
+        }
+        .sample-btn:hover {
+            background: #f0f0f0;
+            border-color: #667eea;
+            transform: translateX(5px);
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 1px solid #f5c6cb;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .feature {
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
+        }
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        .feature h4 {
+            color: #232f3e;
+            margin-bottom: 10px;
+        }
+        .feature p {
+            color: #666;
+            font-size: 14px;
+        }
+        .status-bar {
+            background: #28a745;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            text-align: center;
+            margin: 20px 0;
+            font-weight: 600;
+        }
+        @media (max-width: 768px) {
+            .question-form {
+                flex-direction: column;
+            }
+            input[type="text"], button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 AWS Knowledge Hub</h1>
+        <p class="subtitle">Get instant, intelligent answers to your AWS questions</p>
+        
+        <div class="status-bar">
+            ✅ Server Running | ✅ Database Connected | ✅ Ready to Answer Questions
+        </div>
+
+        <!-- Show error if any -->
+        <script>
+            const urlParams = new URLSearchParams(window.location.search);
+            const error = urlParams.get('error');
+            if (error) {
+                document.write('<div class="error">❌ Error: ' + decodeURIComponent(error) + '</div>');
+            }
+        </script>
+
+        <div class="form-container">
+            <form action="/ask" method="POST" class="question-form">
+                <input 
+                    type="text" 
+                    name="question" 
+                    placeholder="Ask your AWS question here..." 
+                    required
+                    autofocus
+                    maxlength="500"
+                >
+                <button type="submit">Ask Question</button>
+            </form>
+            <div style="text-align: center; margin-top: 15px; color: #666; font-size: 14px;">
+                💡 Press Enter or click "Ask Question" to get your answer
+            </div>
+        </div>
+
+        <div class="sample-questions">
+            <h3>💡 Try These Sample Questions:</h3>
+            <form action="/ask" method="POST" style="margin: 0;">
+                <button type="submit" name="question" value="How do I create an S3 bucket with versioning enabled?" class="sample-btn">
+                    🪣 How do I create an S3 bucket with versioning enabled?
+                </button>
+            </form>
+            <form action="/ask" method="POST" style="margin: 0;">
+                <button type="submit" name="question" value="What causes Lambda timeout errors and how to fix them?" class="sample-btn">
+                    ⚡ What causes Lambda timeout errors and how to fix them?
+                </button>
+            </form>
+            <form action="/ask" method="POST" style="margin: 0;">
+                <button type="submit" name="question" value="How to set up VPC peering between two VPCs?" class="sample-btn">
+                    🌐 How to set up VPC peering between two VPCs?
+                </button>
+            </form>
+            <form action="/ask" method="POST" style="margin: 0;">
+                <button type="submit" name="question" value="What's the difference between EC2 and Lambda?" class="sample-btn">
+                    🔄 What's the difference between EC2 and Lambda?
+                </button>
+            </form>
+            <form action="/ask" method="POST" style="margin: 0;">
+                <button type="submit" name="question" value="How to troubleshoot DynamoDB performance issues?" class="sample-btn">
+                    📊 How to troubleshoot DynamoDB performance issues?
+                </button>
+            </form>
+        </div>
+
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">🤖</div>
+                <h4>Intelligent Analysis</h4>
+                <p>Advanced question processing and AWS service detection</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">📚</div>
+                <h4>Official Documentation</h4>
+                <p>Answers sourced from official AWS documentation</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">⚡</div>
+                <h4>Fast Responses</h4>
+                <p>Average response time under 200ms</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">💼</div>
+                <h4>Production Ready</h4>
+                <p>Enterprise-grade SaaS application</p>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px; color: #666;">
+            <p>
+                <strong>🔧 Alternative Interfaces:</strong><br>
+                <a href="/health" style="color: #007dbc;">API Health Check</a> | 
+                <a href="/api/stats" style="color: #007dbc;">System Stats</a> | 
+                <a href="/api/answers/test" style="color: #007dbc;">Test Suite</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

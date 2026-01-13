@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS Knowledge Hub - Simple Working Version</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #232f3e;
+            text-align: center;
+        }
+        .chat-container {
+            border: 1px solid #ddd;
+            height: 400px;
+            overflow-y: auto;
+            padding: 20px;
+            margin: 20px 0;
+            background: #fafafa;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .user {
+            background: #007dbc;
+            color: white;
+            margin-left: 20%;
+        }
+        .bot {
+            background: #e8f4f8;
+            color: #333;
+            margin-right: 20%;
+        }
+        .input-container {
+            display: flex;
+            gap: 10px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            padding: 12px 24px;
+            background: #ff9900;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #e88b00;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            text-align: center;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .loading { color: orange; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 AWS Knowledge Hub</h1>
+        <div id="status" class="status">Ready to connect...</div>
+        
+        <div id="chatContainer" class="chat-container">
+            <div class="message bot">
+                <strong>AWS Assistant:</strong> Hello! I'm ready to help with AWS questions. 
+                Try asking "How do I create an S3 bucket?"
+            </div>
+        </div>
+        
+        <div class="input-container">
+            <input type="text" id="questionInput" placeholder="Ask your AWS question..." value="How do I create an S3 bucket?">
+            <button id="askButton" onclick="askQuestion()">Ask</button>
+        </div>
+        
+        <div style="margin-top: 20px; text-align: center;">
+            <button onclick="testConnection()" style="margin: 5px;">Test Connection</button>
+            <button onclick="createSession()" style="margin: 5px;">Create Session</button>
+            <button onclick="clearChat()" style="margin: 5px;">Clear Chat</button>
+        </div>
+    </div>
+
+    <script>
+        console.log('JavaScript is loading...');
+        
+        let currentSessionId = null;
+        
+        function updateStatus(message, type = '') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status ' + type;
+            console.log('Status:', message);
+        }
+        
+        function addMessage(content, type) {
+            console.log('Adding message:', content.substring(0, 50), type);
+            const container = document.getElementById('chatContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ' + type;
+            messageDiv.innerHTML = '<strong>' + (type === 'user' ? 'You' : 'AWS Assistant') + ':</strong> ' + content;
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        async function testConnection() {
+            console.log('Testing connection...');
+            updateStatus('Testing connection...', 'loading');
+            
+            try {
+                const response = await fetch('/health');
+                const data = await response.json();
+                console.log('Health check response:', data);
+                
+                if (data.status === 'OK') {
+                    updateStatus('✅ Connection successful!', 'success');
+                    addMessage('Connection test successful!', 'bot');
+                } else {
+                    updateStatus('❌ Connection failed', 'error');
+                    addMessage('Connection test failed', 'bot');
+                }
+            } catch (error) {
+                console.error('Connection test error:', error);
+                updateStatus('❌ Connection error: ' + error.message, 'error');
+                addMessage('Connection error: ' + error.message, 'bot');
+            }
+        }
+        
+        async function createSession() {
+            console.log('Creating session...');
+            updateStatus('Creating session...', 'loading');
+            
+            try {
+                const response = await fetch('/api/sessions/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        preferences: { source: 'simple-test' }
+                    })
+                });
+                
+                const data = await response.json();
+                console.log('Session response:', data);
+                
+                if (data.success) {
+                    currentSessionId = data.data.sessionId;
+                    updateStatus('✅ Session created: ' + currentSessionId.substring(0, 8) + '...', 'success');
+                    addMessage('Session created successfully!', 'bot');
+                } else {
+                    updateStatus('❌ Session creation failed: ' + data.error, 'error');
+                    addMessage('Session creation failed: ' + data.error, 'bot');
+                }
+            } catch (error) {
+                console.error('Session creation error:', error);
+                updateStatus('❌ Session error: ' + error.message, 'error');
+                addMessage('Session error: ' + error.message, 'bot');
+            }
+        }
+        
+        async function askQuestion() {
+            console.log('Ask question called');
+            
+            const input = document.getElementById('questionInput');
+            const question = input.value.trim();
+            
+            if (!question) {
+                alert('Please enter a question');
+                return;
+            }
+            
+            console.log('Question:', question);
+            
+            // Create session if needed
+            if (!currentSessionId) {
+                await createSession();
+                if (!currentSessionId) {
+                    addMessage('Failed to create session. Please try again.', 'bot');
+                    return;
+                }
+            }
+            
+            // Add user message
+            addMessage(question, 'user');
+            
+            // Disable button and show loading
+            const button = document.getElementById('askButton');
+            button.disabled = true;
+            button.textContent = 'Thinking...';
+            updateStatus('Processing question...', 'loading');
+            
+            // Add loading message
+            addMessage('🤔 Thinking...', 'bot');
+            
+            try {
+                console.log('Sending request with sessionId:', currentSessionId);
+                
+                const response = await fetch('/api/answers/complete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        question: question,
+                        sessionId: currentSessionId
+                    })
+                });
+                
+                console.log('Response status:', response.status);
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                // Remove loading message
+                const messages = document.querySelectorAll('.message');
+                const lastMessage = messages[messages.length - 1];
+                if (lastMessage && lastMessage.textContent.includes('Thinking')) {
+                    lastMessage.remove();
+                }
+                
+                if (data.success) {
+                    const answer = data.data.answer;
+                    const processingTime = data.data.metadata?.pipeline?.totalProcessingTime || 0;
+                    
+                    addMessage(answer + '<br><br><small>⚡ Processed in ' + processingTime + 'ms</small>', 'bot');
+                    updateStatus('✅ Answer generated successfully!', 'success');
+                } else {
+                    addMessage('❌ Error: ' + (data.error || 'Unknown error'), 'bot');
+                    updateStatus('❌ Answer generation failed', 'error');
+                }
+                
+            } catch (error) {
+                console.error('Question processing error:', error);
+                
+                // Remove loading message
+                const messages = document.querySelectorAll('.message');
+                const lastMessage = messages[messages.length - 1];
+                if (lastMessage && lastMessage.textContent.includes('Thinking')) {
+                    lastMessage.remove();
+                }
+                
+                addMessage('❌ Network error: ' + error.message, 'bot');
+                updateStatus('❌ Network error', 'error');
+            }
+            
+            // Re-enable button
+            button.disabled = false;
+            button.textContent = 'Ask';
+            input.value = '';
+            input.focus();
+        }
+        
+        function clearChat() {
+            const container = document.getElementById('chatContainer');
+            container.innerHTML = '<div class="message bot"><strong>AWS Assistant:</strong> Chat cleared. Ready for new questions!</div>';
+            updateStatus('Chat cleared', 'success');
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Page loaded, initializing...');
+            updateStatus('Page loaded, ready to test!', 'success');
+            
+            // Add enter key support
+            document.getElementById('questionInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    askQuestion();
+                }
+            });
+            
+            // Auto-test connection
+            setTimeout(testConnection, 1000);
+        });
+        
+        console.log('JavaScript loaded successfully!');
+    </script>
+</body>
+</html>
