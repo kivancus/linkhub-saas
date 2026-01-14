@@ -1,0 +1,249 @@
+name: Deploy to AWS App Runner
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: linkhub-saas
+  APP_RUNNER_SERVICE: linkhub-saas-production
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run tests
+      run: npm test
+
+    - name: Build application
+      run: npm run build
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Create ECR repository if it doesn't exist
+      run: |
+        aws ecr describe-repositories --repository-names $ECR_REPOSITORY --region $AWS_REGION 2>/dev/null || \
+        aws ecr create-repository --repository-name $ECR_REPOSITORY --region $AWS_REGION
+
+    - name: Build, tag, and push image to Amazon ECR
+      id: build-image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        # Build a docker container and push it to ECR
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        
+        # Also tag as latest
+        docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        
+        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+    - name: Check if App Runner service exists
+      id: check-service
+      run: |
+        if aws apprunner list-services --region $AWS_REGION --query "ServiceSummaryList[?ServiceName=='$APP_RUNNER_SERVICE'].ServiceName" --output text | grep -q "$APP_RUNNER_SERVICE"; then
+          echo "service_exists=true" >> $GITHUB_OUTPUT
+          SERVICE_ARN=$(aws apprunner list-services --region $AWS_REGION --query "ServiceSummaryList[?ServiceName=='$APP_RUNNER_SERVICE'].ServiceArn" --output text)
+          echo "service_arn=$SERVICE_ARN" >> $GITHUB_OUTPUT
+        else
+          echo "service_exists=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Create App Runner service
+      if: steps.check-service.outputs.service_exists == 'false'
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        cat > apprunner-config.json << EOF
+        {
+          "ServiceName": "$APP_RUNNER_SERVICE",
+          "SourceConfiguration": {
+            "ImageRepository": {
+              "ImageIdentifier": "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG",
+              "ImageConfiguration": {
+                "Port": "3000",
+                "RuntimeEnvironmentVariables": {
+                  "NODE_ENV": "production",
+                  "PORT": "3000"
+                }
+              },
+              "ImageRepositoryType": "ECR"
+            },
+            "AutoDeploymentsEnabled": true
+          },
+          "InstanceConfiguration": {
+            "Cpu": "0.25 vCPU",
+            "Memory": "0.5 GB"
+          },
+          "HealthCheckConfiguration": {
+            "Protocol": "HTTP",
+            "Path": "/health",
+            "Interval": 20,
+            "Timeout": 5,
+            "HealthyThreshold": 1,
+            "UnhealthyThreshold": 5
+          },
+          "Tags": [
+            {
+              "Key": "Environment",
+              "Value": "production"
+            },
+            {
+              "Key": "Application",
+              "Value": "linkhub-saas"
+            }
+          ]
+        }
+        EOF
+        
+        aws apprunner create-service --cli-input-json file://apprunner-config.json --region $AWS_REGION
+
+    - name: Update App Runner service
+      if: steps.check-service.outputs.service_exists == 'true'
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        cat > apprunner-update-config.json << EOF
+        {
+          "SourceConfiguration": {
+            "ImageRepository": {
+              "ImageIdentifier": "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG",
+              "ImageConfiguration": {
+                "Port": "3000",
+                "RuntimeEnvironmentVariables": {
+                  "NODE_ENV": "production",
+                  "PORT": "3000"
+                }
+              },
+              "ImageRepositoryType": "ECR"
+            },
+            "AutoDeploymentsEnabled": true
+          }
+        }
+        EOF
+        
+        aws apprunner update-service \
+          --service-arn "${{ steps.check-service.outputs.service_arn }}" \
+          --source-configuration file://apprunner-update-config.json \
+          --region $AWS_REGION
+
+    - name: Wait for deployment to complete
+      run: |
+        echo "Waiting for App Runner service to be ready..."
+        
+        # Get service ARN
+        SERVICE_ARN=$(aws apprunner list-services --region $AWS_REGION --query "ServiceSummaryList[?ServiceName=='$APP_RUNNER_SERVICE'].ServiceArn" --output text)
+        
+        # Wait for service to be running
+        aws apprunner wait service-running --service-arn "$SERVICE_ARN" --region $AWS_REGION
+        
+        # Get service URL
+        SERVICE_URL=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --region $AWS_REGION --query "Service.ServiceUrl" --output text)
+        
+        echo "🎉 Deployment completed successfully!"
+        echo "🌐 Your LinkHub SaaS is available at: https://$SERVICE_URL"
+        
+        # Save URL for next steps
+        echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_ENV
+
+    - name: Run health check
+      run: |
+        echo "🏥 Running health check..."
+        
+        # Wait a bit for the service to be fully ready
+        sleep 30
+        
+        # Test health endpoint
+        if curl -f -s "https://$SERVICE_URL/health" > /dev/null; then
+          echo "✅ Health check passed!"
+        else
+          echo "❌ Health check failed!"
+          exit 1
+        fi
+
+    - name: Create deployment summary
+      run: |
+        cat >> $GITHUB_STEP_SUMMARY << EOF
+        # 🚀 Deployment Summary
+        
+        ## ✅ Successfully deployed to AWS App Runner
+        
+        - **Service**: $APP_RUNNER_SERVICE
+        - **Region**: $AWS_REGION
+        - **Image**: ${{ steps.build-image.outputs.image }}
+        - **URL**: https://$SERVICE_URL
+        
+        ## 🔗 Quick Links
+        - [Live Application](https://$SERVICE_URL)
+        - [Health Check](https://$SERVICE_URL/health)
+        - [AWS Console](https://console.aws.amazon.com/apprunner/home?region=$AWS_REGION#/services)
+        
+        ## 📋 Next Steps
+        1. Test your application at the URL above
+        2. Configure environment variables in AWS Systems Manager
+        3. Set up Stripe webhooks: \`https://$SERVICE_URL/api/webhooks/stripe\`
+        4. Consider setting up a custom domain
+        
+        ## 🛠️ Useful Commands
+        \`\`\`bash
+        # View logs
+        aws logs tail /aws/apprunner/$APP_RUNNER_SERVICE --follow
+        
+        # Update environment variables
+        aws ssm put-parameter --name "/linkhub/jwt-secret" --value "your-secret" --type "SecureString"
+        \`\`\`
+        EOF
+
+  notify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Notify deployment status
+      run: |
+        if [ "${{ needs.deploy.result }}" == "success" ]; then
+          echo "✅ Deployment successful!"
+        else
+          echo "❌ Deployment failed!"
+          exit 1
+        fi
