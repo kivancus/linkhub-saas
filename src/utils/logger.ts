@@ -1,6 +1,18 @@
 import { createLogger, format, transports } from 'winston';
+import { existsSync, mkdirSync } from 'fs';
+import path from 'path';
 
 const { combine, timestamp, errors, json, colorize, simple } = format;
+
+// Ensure logs directory exists
+const logsDir = path.join(process.cwd(), 'logs');
+try {
+  if (!existsSync(logsDir)) {
+    mkdirSync(logsDir, { recursive: true });
+  }
+} catch (error) {
+  console.warn('Could not create logs directory, using console logging only:', error);
+}
 
 // Create logger instance
 const logger = createLogger({
@@ -12,21 +24,24 @@ const logger = createLogger({
   ),
   defaultMeta: { service: 'linkhub-saas' },
   transports: [
-    // Write all logs with importance level of `error` or less to `error.log`
-    new transports.File({ filename: 'logs/error.log', level: 'error' }),
-    // Write all logs with importance level of `info` or less to `combined.log`
-    new transports.File({ filename: 'logs/combined.log' }),
+    // Always add console transport
+    new transports.Console({
+      format: combine(
+        colorize(),
+        simple()
+      )
+    })
   ],
 });
 
-// If we're not in production, log to the console with a simple format
-if (process.env['NODE_ENV'] !== 'production') {
-  logger.add(new transports.Console({
-    format: combine(
-      colorize(),
-      simple()
-    )
-  }));
+// Add file transports only if logs directory is writable
+try {
+  if (existsSync(logsDir)) {
+    logger.add(new transports.File({ filename: path.join(logsDir, 'error.log'), level: 'error' }));
+    logger.add(new transports.File({ filename: path.join(logsDir, 'combined.log') }));
+  }
+} catch (error) {
+  console.warn('Could not add file transports, using console logging only:', error);
 }
 
 export default logger;

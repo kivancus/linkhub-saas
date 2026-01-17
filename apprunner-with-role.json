@@ -1,0 +1,22 @@
+{
+  "ServiceName": "linkhub-saas",
+  "SourceConfiguration": {
+    "ImageRepository": {
+      "ImageIdentifier": "893519145403.dkr.ecr.us-east-1.amazonaws.com/linkhub-saas:latest",
+      "ImageConfiguration": {
+        "Port": "3000",
+        "RuntimeEnvironmentVariables": {
+          "NODE_ENV": "production",
+          "PORT": "3000"
+        }
+      },
+      "ImageRepositoryType": "ECR"
+    },
+    "AutoDeploymentsEnabled": false
+  },
+  "InstanceConfiguration": {
+    "Cpu": "0.25 vCPU",
+    "Memory": "0.5 GB",
+    "InstanceRoleArn": "arn:aws:iam::893519145403:role/AppRunnerECRAccessRole"
+  }
+}

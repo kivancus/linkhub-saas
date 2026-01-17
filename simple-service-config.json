@@ -1,0 +1,16 @@
+{
+  "ServiceName": "linkhub-saas",
+  "SourceConfiguration": {
+    "ImageRepository": {
+      "ImageIdentifier": "893519145403.dkr.ecr.us-east-1.amazonaws.com/linkhub-saas:latest",
+      "ImageConfiguration": {
+        "Port": "3000"
+      },
+      "ImageRepositoryType": "ECR"
+    }
+  },
+  "InstanceConfiguration": {
+    "Cpu": "0.25 vCPU",
+    "Memory": "0.5 GB"
+  }
+}

@@ -1,9 +1,15 @@
 # Multi-stage build for production
-FROM node:18-alpine AS base
+FROM node:18-slim AS base
+
+# Install OpenSSL and other dependencies for Prisma
+RUN apt-get update && apt-get install -y \
+    openssl \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies only when needed
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copy package files
@@ -32,8 +38,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# Create non-root user
+RUN groupadd --gid 1001 nodejs && \
+    useradd --uid 1001 --gid nodejs --shell /bin/bash --create-home nextjs
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
@@ -42,8 +49,8 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/public ./public
 
-# Create uploads directory
-RUN mkdir -p uploads && chown nextjs:nodejs uploads
+# Create uploads and logs directories with proper permissions
+RUN mkdir -p uploads logs && chown nextjs:nodejs uploads logs
 
 USER nextjs
 

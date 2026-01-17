@@ -22,7 +22,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Check if AWS CLI is installed
-if ! command -v aws &> /dev/null; then
+if ! command -v aws >/dev/null 2>&1; then
     echo -e "${RED}❌ AWS CLI is not installed.${NC}"
     echo -e "${YELLOW}Please install it first:${NC}"
     echo "curl \"https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip\" -o \"awscliv2.zip\""
@@ -32,22 +32,26 @@ if ! command -v aws &> /dev/null; then
 fi
 
 # Check if Docker is installed
-if ! command -v docker &> /dev/null; then
+if ! command -v docker >/dev/null 2>&1; then
     echo -e "${RED}❌ Docker is not installed.${NC}"
     echo -e "${YELLOW}Please install Docker first.${NC}"
     exit 1
 fi
 
 # Check AWS credentials
-if ! aws sts get-caller-identity &> /dev/null; then
+echo -e "${BLUE}🔍 Verifying AWS credentials...${NC}"
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null)
+if [ -z "$AWS_ACCOUNT_ID" ]; then
     echo -e "${RED}❌ AWS credentials not configured.${NC}"
     echo -e "${YELLOW}Please run: aws configure${NC}"
     exit 1
+else
+    echo -e "${GREEN}✅ AWS credentials verified (Account: $AWS_ACCOUNT_ID)${NC}"
 fi
 
 # Get AWS account ID
 echo -e "${BLUE}📋 Getting AWS account information...${NC}"
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+ACCOUNT_ID=$AWS_ACCOUNT_ID
 ECR_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
 IMAGE_URI="$ECR_URI/$ECR_REPO_NAME:latest"
 
